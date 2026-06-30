@@ -3,19 +3,19 @@ package org.server.lava_rising;
 
 import org.bukkit.*;
 import org.bukkit.block.Block;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
+
 import org.bukkit.entity.Player;
+
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.util.Objects;
 
 
-public class Lava_rising extends JavaPlugin implements CommandExecutor {
+
+public class Lava_rising extends JavaPlugin {
     private static Lava_rising instance;
+    private PvpDisableListener pvpListener;
 
     private BukkitTask rise;
     private BukkitTask end;
@@ -28,115 +28,100 @@ public class Lava_rising extends JavaPlugin implements CommandExecutor {
 
         instance = this;
         // 注册指令
-        Objects.requireNonNull(this.getCommand("lavarise")).setExecutor(this);
+        new StartCommand(this);
+        getServer().getPluginManager().registerEvents(new WorldRestrictionListener(), this);
+        getServer().getPluginManager().registerEvents(new PvpDisableListener(),this);
+        this.pvpListener = new PvpDisableListener();
+        getServer().getPluginManager().registerEvents(pvpListener, this);
+        //游戏开始时关闭玩家pvp
+        Lava_rising.getInstance().getPvpListener().setPvpDisabled(true);
+
+
     }
 
     public static Lava_rising getInstance(){
         return instance;
     }
 
+    public PvpDisableListener getPvpListener() {
+        return pvpListener;
+    }
+
+
     @Override
     public void onDisable() {
         stopLavaRise();
     }
 
-    public boolean onCommand(CommandSender s,Command c,String label,String[] args){
-        if(args.length > 0){
-            if(args[0].equalsIgnoreCase("start")){
-                if (isRunning){
-                    s.sendMessage("岩浆已开始上升");
-                    return true;
-                }
-                World world = Bukkit.getWorld("world");
-                WorldBorder border = world.getWorldBorder();
-                border.changeSize(500,0);
-                border.changeSize(100, 12000);
-                border.setDamageAmount(5);
-                border.setDamageBuffer(0);
-                startLavaRise(-1);
 
-                return true;
-                }
-
-        }
-        if(args[0].equalsIgnoreCase("stop")){
-            if(!isRunning){
-                s.sendMessage("未启动");
-                return true;
-
-            }
-            stopLavaRise();
-            s.sendMessage("游戏已强制停止");
-        }
-
-        return false;
-    }
-    private void startLavaRise(int startY){
+    public void startLavaRise(int startY){
         this.currentY = startY;
         this.isRunning = true;
         this.centerLocation = Bukkit.getWorlds().get(0).getSpawnLocation();
         World world = centerLocation.getWorld();
-        int half = 120/2;
-        rise = new BukkitRunnable(){
+        int half = 200;
+        rise = new BukkitRunnable() {
+            int minX = centerLocation.getBlockX() - half;
+            int maxX = centerLocation.getBlockX() + half;
+            int minZ = centerLocation.getBlockZ() - half;
+            int maxZ = centerLocation.getBlockZ() + half;
+
+            int currentX = minX; // 当前铺到了哪一行
+
             @Override
             public void run() {
-                if (!isRunning){
+                // 游戏停止或超过最高高度，自动退出
+                if (!isRunning) {
                     cancel();
                     return;
                 }
-                if(currentY > 319){
+                if (currentY > 319) {
                     checkWinner();
                     stopLavaRise();
+                    cancel();
                     return;
-
                 }
-                int minX = centerLocation.getBlockX() - half;
-                int maxX = centerLocation.getBlockX() + half;
-                int minZ = centerLocation.getBlockZ() - half;
-                int maxZ = centerLocation.getBlockZ() + half;
 
-                // 极简且避免单Tick填充250,000个方块导致主线程卡死的双重循环。
-                // 仅替换空气和不可燃的流体，保留实体建筑物，提供极限生存的趣味
-                new BukkitRunnable() {
-                    int currentX = minX;
-                    @Override
-                    public void run() {
-                        if (!isRunning || currentY > 319) {
-                            cancel();
-                            return;
-                        }
-
-                        int linesPerTick = 25;
-                        for (int i = 0; i < linesPerTick && currentX <= maxX; i++) {
-                            for (int z = minZ; z <= maxZ; z++) {
-                                Block block = world.getBlockAt(currentX, currentY, z);
-
-                                block.setType(Material.LAVA, false);
-
-                            }
-                            currentX++;
-                        }
-                        if (currentX > maxX) {
-                            cancel();
+                // 每一Tick填充30行
+                int linesPerTick = 30;
+                for (int i = 0; i < linesPerTick && currentX <= maxX; i++) {
+                    for (int z = minZ; z <= maxZ; z++) {
+                        Block block = world.getBlockAt(currentX, currentY, z);
+                        // 仅替换空气和不可燃的流体，提升趣味并减少卡顿
+                        if (block.getType() == Material.AIR || block.getType() == Material.WATER) {
+                            block.setType(Material.LAVA, false);
                         }
                     }
-                }.runTaskTimer(Lava_rising.this, 0L, 4L);
-
-                currentY++;
-                getServer().broadcastMessage("现在岩浆高度：" + currentY);
-
-
-                if (currentY % 5 == 0) {
-                    checkWinner();
+                    currentX++;
                 }
-                if (currentY == 64){
-                    registerDeathEvent();
-                    getServer().broadcastMessage("岩浆已上升至Y=64，现在死亡无法重生！");
+
+                // 当 currentX超过maxX，说明当前层已经全部铺完
+                if (currentX > maxX) {
+                    // 1. 播报上一层完成的消息
+                    getServer().broadcastMessage("当前岩浆高度已达到：Y = " + currentY);
+
+                    // 2. 触发阶段性事件
+                    if (currentY % 5 == 0) {
+                        checkWinner();
+                    }
+                    if (currentY == 64) {
+                        registerDeathEvent();
+                        getServer().broadcastMessage("岩浆已上升至Y=64，现在死亡无法重生！");
+                    }
+                    //岩浆达到Y=100开启pvp
+                    if (currentY == 100){
+                        Lava_rising.getInstance().getPvpListener().setPvpDisabled(false);
+
+                    }
+
+                    // 3. 层数加 1，重置 X 轴指针，准备下一层
+                    currentY++;
+                    currentX = minX;
                 }
             }
-        }.runTaskTimer(this,100L,100L);
+        }.runTaskTimer(this, 100L, 16L);
     }
-    void stopLavaRise(){
+    public void stopLavaRise(){
         if(rise != null){
             rise.cancel();
             rise = null;
@@ -164,6 +149,10 @@ public class Lava_rising extends JavaPlugin implements CommandExecutor {
         getServer().getPluginManager().registerEvents(new PlayerDeath(), this);
 
     }
+
+
+
+
 }
 
 
