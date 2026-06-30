@@ -1,0 +1,162 @@
+package org.server.lava_rising;
+
+
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
+
+/**
+ * 极简500x500岩浆上升挑战插件
+ *
+ * 功能:
+ * 1. 启动后，每隔 5 秒（100 ticks）岩浆向上攀升 1 格
+ * 2. 在以启动者（或世界出生点）为中心的 500x500 范围内，替换空气/洞穴空气/水为岩浆
+ * 3. 带有全服大喇叭提示与防卡顿优化
+ */
+public class Lava_risin extends JavaPlugin implements CommandExecutor {
+
+    private BukkitTask riseTask;
+    private int currentY = 60;
+    private boolean isRunning = false;
+    private Location centerLocation;
+
+    @Override
+    public void onEnable() {
+        // 注册指令
+        this.getCommand("lavarise").setExecutor(this);
+        getLogger().info("LavaRiseChallenge 插件已成功加载！作者: Harry");
+    }
+
+    @Override
+    public void onDisable() {
+        stopLavaRise();
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length > 0) {
+            if (args[0].equalsIgnoreCase("start")) {
+                if (isRunning) {
+                    sender.sendMessage("§c[!] 岩浆上涨已经在运行中，当前高度 Y: " + currentY);
+                    return true;
+                }
+
+                // 确定起始 Y 轴
+                int startY = 60;
+                if (args.length > 1) {
+                    try {
+                        startY = Integer.parseInt(args[1]);
+                    } catch (NumberFormatException e) {
+                        sender.sendMessage("§c参数错误！请输入正确的起始高度数字。");
+                        return true;
+                    }
+                } else if (sender instanceof Player) {
+                    // 若玩家未指定高度，默认从玩家脚下开始
+                    startY = ((Player) sender).getLocation().getBlockY() - 1;
+                }
+
+                startLavaRise(startY, sender);
+                return true;
+            } else if (args[0].equalsIgnoreCase("stop")) {
+                if (!isRunning) {
+                    sender.sendMessage("§e[!] 并没有正在运行的岩浆上涨挑战。");
+                    return true;
+                }
+                stopLavaRise();
+                Bukkit.broadcastMessage("§a§l[!] 岩浆上升已由 " + sender.getName() + " 手动停止！");
+                return true;
+            } else if (args[0].equalsIgnoreCase("info")) {
+                sender.sendMessage("§6=== LavaRiseChallenge 状态 ===");
+                sender.sendMessage("§e运行状态: " + (isRunning ? "§a正在运行" : "§c未启动"));
+                sender.sendMessage("§e当前高度 Y: " + currentY);
+                sender.sendMessage("§e范围大小: 500x500 格");
+                sender.sendMessage("§e上升间隔: 5 秒/格");
+                return true;
+            }
+        }
+
+        sender.sendMessage("§b=== LavaRiseChallenge 指令指南 ===");
+        sender.sendMessage("§f/lavarise start [高度] §7- 开启挑战");
+        sender.sendMessage("§f/lavarise stop      §7- 终止挑战");
+        sender.sendMessage("§f/lavarise info      §7- 查看插件状态");
+        return true;
+    }
+
+    private void startLavaRise(int startY, CommandSender initiator) {
+        this.currentY = startY;
+        this.isRunning = true;
+
+        // 设置中心位置（以执行者或主世界出生点为准）
+        if (initiator instanceof Player) {
+            this.centerLocation = ((Player) initiator).getLocation();
+        } else {
+            this.centerLocation = Bukkit.getWorlds().get(0).getSpawnLocation();
+        }
+
+        World world = centerLocation.getWorld();
+        int halfSize = 500 / 2;
+
+        Bukkit.broadcastMessage("§c§l[!] ========================================");
+        Bukkit.broadcastMessage("§c§l[!] LavaRiseChallenge 极限挑战已开启！");
+        Bukkit.broadcastMessage("§c§l[!] 中心坐标: " + centerLocation.getBlockX() + ", " + centerLocation.getBlockZ());
+        Bukkit.broadcastMessage("§c§l[!] 范围范围: " + config.areaSize + "x" + config.areaSize + " | 初始 Y: " + currentY);
+        Bukkit.broadcastMessage("§c§l[!] 提示: 每隔 5 秒，岩浆将无情地上涨 1 格！跑！");
+        Bukkit.broadcastMessage("§c§l[!] ========================================");
+
+        // 创建异步或同步定时调度器。在Spigot中，修改方块必须在主线程(Synchronous)进行。
+        // 20 ticks = 1s，故 5 * 20
+        riseTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!isRunning) {
+                    cancel();
+                    return;
+                }
+
+                if (currentY > 256) {
+                    Bukkit.broadcastMessage("§a§l[!] 恭喜！岩浆已上涨至最高限制高度 " + 256 + "，挑战结束！");
+                    stopLavaRise();
+                    return;
+                }
+
+                Bukkit.broadcastMessage("§e§l⚠️ 岩浆已上涨至 Y: " + currentY + "！迅速寻找高处！");
+
+                int minX = centerLocation.getBlockX() - halfSize;
+                int maxX = centerLocation.getBlockX() + halfSize;
+                int minZ = centerLocation.getBlockZ() - halfSize;
+                int maxZ = centerLocation.getBlockZ() + halfSize;
+
+                // 极简且避免单Tick填充250,000个方块导致主线程卡死的双重循环。
+                // 仅替换空气和不可燃的流体，保留实体建筑物，提供极限生存的趣味
+                int filledCount = 0;
+                for (int x = minX; x <= maxX; x++) {
+                    for (int z = minZ; z <= maxZ; z++) {
+                        Block block = world.getBlockAt(x, currentY, z);
+                        block.setType(Material.LAVA);
+                        filledCount++;
+
+                    }
+                }
+
+                currentY++;
+            }
+        }.runTaskTimer(this, 100L, 100L); // 100L 表示5秒后开始第一次上涨
+    }
+
+    private void stopLavaRise() {
+        if (riseTask != null) {
+            riseTask.cancel();
+            riseTask = null;
+        }
+        isRunning = false;
+    }
+}

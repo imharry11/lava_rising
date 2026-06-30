@@ -1,0 +1,10 @@
+name: lava_rising
+version: '${version}'
+
+main: org.server.lava_rising.Lava_rising
+api-version: '1.21.11'
+load: POSTWORLD
+commands:
+  lavarise:
+    description: :开始岩浆上升游戏
+    usage: /<command>
