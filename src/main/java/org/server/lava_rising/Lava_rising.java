@@ -15,26 +15,33 @@ import org.bukkit.scheduler.BukkitTask;
 
 public class Lava_rising extends JavaPlugin {
     private static Lava_rising instance;
-    private PvpDisableListener pvpListener;
+    public static boolean pvpEnabled = false;
+
 
     private BukkitTask rise;
     private BukkitTask end;
     private int currentY = 60;
     boolean isRunning = false;
     private Location centerLocation;
+    private int pvpStartY = this.getConfig().getInt("settings.pvp-start-lava-y");
+    private int lavaStopY = this.getConfig().getInt("settings.stop-y");
+    private int riseSpeed = this.getConfig().getInt("settings.rise-speed");
 
     @Override
     public void onEnable() {
-
+        Lava_rising.pvpEnabled = false;
         instance = this;
+        this.saveDefaultConfig();
+
         // 注册指令
-        new StartCommand(this);
+        this.getCommand("lavarise").setExecutor(new StartCommand());
         getServer().getPluginManager().registerEvents(new WorldRestrictionListener(), this);
-        getServer().getPluginManager().registerEvents(new PvpDisableListener(),this);
-        this.pvpListener = new PvpDisableListener();
-        getServer().getPluginManager().registerEvents(pvpListener, this);
+        getServer().getPluginManager().registerEvents(new PvpListener(), this);
+
+
+
         //游戏开始时关闭玩家pvp
-        Lava_rising.getInstance().getPvpListener().setPvpDisabled(true);
+
 
 
     }
@@ -43,9 +50,7 @@ public class Lava_rising extends JavaPlugin {
         return instance;
     }
 
-    public PvpDisableListener getPvpListener() {
-        return pvpListener;
-    }
+
 
 
     @Override
@@ -54,10 +59,14 @@ public class Lava_rising extends JavaPlugin {
     }
 
 
-    public void startLavaRise(int startY){
-        this.currentY = startY;
+    public void startLavaRise(){
+        this.currentY = this.getConfig().getInt("settings.start-y",319);
         this.isRunning = true;
         this.centerLocation = Bukkit.getWorlds().get(0).getSpawnLocation();
+        this.pvpStartY = this.getConfig().getInt("settings.pvp-start-lava-y");
+        this.lavaStopY = this.getConfig().getInt("settings.stop-y");
+        this.riseSpeed = this.getConfig().getInt("settings.rise-speed");
+
         World world = centerLocation.getWorld();
         int half = 200;
         rise = new BukkitRunnable() {
@@ -75,7 +84,7 @@ public class Lava_rising extends JavaPlugin {
                     cancel();
                     return;
                 }
-                if (currentY > 319) {
+                if (currentY > lavaStopY) {
                     checkWinner();
                     stopLavaRise();
                     cancel();
@@ -109,8 +118,9 @@ public class Lava_rising extends JavaPlugin {
                         getServer().broadcastMessage("岩浆已上升至Y=64，现在死亡无法重生！");
                     }
                     //岩浆达到Y=100开启pvp
-                    if (currentY == 100){
-                        Lava_rising.getInstance().getPvpListener().setPvpDisabled(false);
+                    if (currentY == pvpStartY){
+                        Lava_rising.pvpEnabled = true;
+
 
                     }
 
@@ -119,7 +129,7 @@ public class Lava_rising extends JavaPlugin {
                     currentX = minX;
                 }
             }
-        }.runTaskTimer(this, 100L, 16L);
+        }.runTaskTimer(this, 0L, riseSpeed);
     }
     public void stopLavaRise(){
         if(rise != null){

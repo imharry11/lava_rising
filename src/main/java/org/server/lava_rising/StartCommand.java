@@ -9,10 +9,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class StartCommand implements CommandExecutor {
     Lava_rising plugin = JavaPlugin.getPlugin(Lava_rising.class);
-    public StartCommand(JavaPlugin plugin){
-        plugin.getCommand("lavarise").setExecutor(plugin);
-    }
+
     public boolean onCommand(CommandSender s, org.bukkit.command.Command c, String label, String[] args){
+        int startSize = plugin.getConfig().getInt("settings.border-start-size");
+        int changeSize = plugin.getConfig().getInt("settings.border-change-size");
+        int changeTick = plugin.getConfig().getInt("settings.border-time");
         if(args.length > 0){
             if(args[0].equalsIgnoreCase("start")){
                 if (plugin.isRunning){
@@ -21,11 +22,11 @@ public class StartCommand implements CommandExecutor {
                 }
                 World world = Bukkit.getWorld("world");
                 WorldBorder border = world.getWorldBorder();
-                border.changeSize(1000,0);
-                border.changeSize(50, 12000);
+                border.changeSize(startSize,0);
+                border.changeSize(changeSize, changeTick);
                 border.setDamageAmount(3);
                 border.setDamageBuffer(0);
-                plugin.startLavaRise(-64);
+                plugin.startLavaRise();
 
                 return true;
             }
