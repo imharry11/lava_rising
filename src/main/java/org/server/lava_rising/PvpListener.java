@@ -10,7 +10,7 @@ public class PvpListener implements Listener {
 
     @EventHandler
     public void onPlayerAttack(EntityDamageByEntityEvent event) {
-        // 【关键点】如果全局允许PVP，当前监听器直接罢工，不做任何拦截
+        //
         if (Lava_rising.pvpEnabled) {
             return;
         }
@@ -29,7 +29,7 @@ public class PvpListener implements Listener {
 
         if (attacker != null) {
             event.setCancelled(true);
-            attacker.sendMessage("§c[提示] 当前阶段禁止玩家间互相攻击！");
+            attacker.sendMessage("§c当前阶段禁止玩家间互相攻击！");
         }
     }
 }
