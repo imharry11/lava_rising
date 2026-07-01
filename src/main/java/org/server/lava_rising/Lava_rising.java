@@ -29,6 +29,8 @@ public class Lava_rising extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        //游戏开始时关闭玩家pvp
+
         Lava_rising.pvpEnabled = false;
         instance = this;
         this.saveDefaultConfig();
@@ -37,10 +39,6 @@ public class Lava_rising extends JavaPlugin {
         this.getCommand("lavarise").setExecutor(new StartCommand());
         getServer().getPluginManager().registerEvents(new WorldRestrictionListener(), this);
         getServer().getPluginManager().registerEvents(new PvpListener(), this);
-
-
-
-        //游戏开始时关闭玩家pvp
 
 
 
@@ -79,7 +77,7 @@ public class Lava_rising extends JavaPlugin {
 
             @Override
             public void run() {
-                // 游戏停止或超过最高高度，自动退出
+                //游戏停止或超过最高高度，自动退出
                 if (!isRunning) {
                     cancel();
                     return;
@@ -91,12 +89,12 @@ public class Lava_rising extends JavaPlugin {
                     return;
                 }
 
-                // 每一Tick填充30行
+                //每一Tick填充30行
                 int linesPerTick = 30;
                 for (int i = 0; i < linesPerTick && currentX <= maxX; i++) {
                     for (int z = minZ; z <= maxZ; z++) {
                         Block block = world.getBlockAt(currentX, currentY, z);
-                        // 仅替换空气和不可燃的流体，提升趣味并减少卡顿
+                        //仅替换空气和不可燃的流体，提升趣味并减少卡顿
                         if (block.getType() == Material.AIR || block.getType() == Material.WATER) {
                             block.setType(Material.LAVA, false);
                         }
@@ -104,12 +102,12 @@ public class Lava_rising extends JavaPlugin {
                     currentX++;
                 }
 
-                // 当 currentX超过maxX，说明当前层已经全部铺完
+                //当currentX超过maxX，说明当前层已经全部铺完
                 if (currentX > maxX) {
-                    // 1. 播报上一层完成的消息
+                    //1.播报上一层完成的消息
                     getServer().broadcastMessage("当前岩浆高度已达到：Y = " + currentY);
 
-                    // 2. 触发阶段性事件
+                    //2.触发阶段性事件
                     if (currentY % 5 == 0) {
                         checkWinner();
                     }
@@ -124,7 +122,7 @@ public class Lava_rising extends JavaPlugin {
 
                     }
 
-                    // 3. 层数加 1，重置 X 轴指针，准备下一层
+                    //3.层数加1，重置x轴指针，准备下一层
                     currentY++;
                     currentX = minX;
                 }
@@ -159,10 +157,6 @@ public class Lava_rising extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerDeath(), this);
 
     }
-
-
-
-
 }
 
 
