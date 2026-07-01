@@ -1,6 +1,8 @@
 package org.server.lava_rising;
 
 
+import net.kyori.adventure.text.Component;
+import net.md_5.bungee.api.ChatMessageType;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 
@@ -9,7 +11,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-
 
 
 
@@ -66,7 +67,7 @@ public class Lava_rising extends JavaPlugin {
         this.riseSpeed = this.getConfig().getInt("settings.rise-speed");
 
         World world = centerLocation.getWorld();
-        int half = 200;
+        int half = 230;
         rise = new BukkitRunnable() {
             int minX = centerLocation.getBlockX() - half;
             int maxX = centerLocation.getBlockX() + half;
@@ -105,7 +106,7 @@ public class Lava_rising extends JavaPlugin {
                 //当currentX超过maxX，说明当前层已经全部铺完
                 if (currentX > maxX) {
                     //1.播报上一层完成的消息
-                    getServer().broadcastMessage("当前岩浆高度已达到：Y = " + currentY);
+                    Bukkit.getServer().sendActionBar(Component.text("当前岩浆已达到" + currentY));
 
                     //2.触发阶段性事件
                     if (currentY % 5 == 0) {
@@ -118,6 +119,7 @@ public class Lava_rising extends JavaPlugin {
                     //岩浆达到Y=100开启pvp
                     if (currentY == pvpStartY){
                         Lava_rising.pvpEnabled = true;
+                        getServer().broadcastMessage("岩浆已上升至"+ pvpStartY + "现在开始玩家pvp！");
 
 
                     }
