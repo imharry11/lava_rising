@@ -25,7 +25,7 @@ public final class PlayerDeath implements Listener {
                 .count();
 
         int survivalPlayers = (int) survivalCount;
-        if (survivalCount == 1 && plugin.isRunning) {
+        if (survivalCount >= 1 && plugin.isRunning) {
             Player winner = Bukkit.getOnlinePlayers().stream()
                     .filter(player -> player.getGameMode() == GameMode.SURVIVAL)
                     .findFirst().orElse(null);

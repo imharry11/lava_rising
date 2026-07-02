@@ -2,7 +2,6 @@ package org.server.lava_rising;
 
 
 import net.kyori.adventure.text.Component;
-import net.md_5.bungee.api.ChatMessageType;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 
@@ -43,6 +42,7 @@ public class Lava_rising extends JavaPlugin {
 
 
 
+
     }
 
     public static Lava_rising getInstance(){
@@ -59,15 +59,22 @@ public class Lava_rising extends JavaPlugin {
 
 
     public void startLavaRise(){
+        NewWorld newWorld = new NewWorld();
+        newWorld.createNewWorld();
+
+
+
+
         this.currentY = this.getConfig().getInt("settings.start-y",319);
         this.isRunning = true;
-        this.centerLocation = Bukkit.getWorlds().get(0).getSpawnLocation();
+
+        this.centerLocation = Bukkit.getWorld("play_world").getSpawnLocation();
         this.pvpStartY = this.getConfig().getInt("settings.pvp-start-lava-y");
         this.lavaStopY = this.getConfig().getInt("settings.stop-y");
         this.riseSpeed = this.getConfig().getInt("settings.rise-speed");
 
         World world = centerLocation.getWorld();
-        int half = 230;
+        int half = 280;
         rise = new BukkitRunnable() {
             int minX = centerLocation.getBlockX() - half;
             int maxX = centerLocation.getBlockX() + half;
@@ -132,11 +139,17 @@ public class Lava_rising extends JavaPlugin {
         }.runTaskTimer(this, 0L, riseSpeed);
     }
     public void stopLavaRise(){
+
         if(rise != null){
             rise.cancel();
             rise = null;
         }
+        org.server.lava_rising.NewWorld w =new NewWorld();
+        w.deleteNewWorld();
+        Lava_rising.pvpEnabled = false;
         isRunning = false;
+
+
     }
     public void checkWinner() {
         long survivalCount = Bukkit.getOnlinePlayers().stream()
@@ -159,6 +172,8 @@ public class Lava_rising extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerDeath(), this);
 
     }
+
+
 }
 
 
